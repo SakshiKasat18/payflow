@@ -8,12 +8,20 @@ const requireEnv = (key: string, fallback?: string): string => {
   return value;
 };
 
+const isProd = process.env['NODE_ENV'] === 'production';
+
+let jwtSecret = process.env['JWT_SECRET'];
+if (isProd && (!jwtSecret || jwtSecret === 'dev-secret-change-in-production')) {
+  throw new Error('FATAL: JWT_SECRET environment variable must be set to a secure secret in production.');
+}
+jwtSecret = jwtSecret ?? 'dev-secret-change-in-production';
+
 export const env = {
-  port: parseInt(process.env['PORT'] ?? '5000', 10),
+  port: parseInt(process.env['PORT'] ?? '3001', 10),
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
   databaseUrl: process.env['DATABASE_URL'] ?? '',
-  jwtSecret: process.env['JWT_SECRET'] ?? 'dev-secret-change-in-production',
+  jwtSecret,
   clientUrl: requireEnv('CLIENT_URL', 'http://localhost:5173'),
   isDevelopment: (process.env['NODE_ENV'] ?? 'development') === 'development',
-  isProduction: process.env['NODE_ENV'] === 'production',
+  isProduction: isProd,
 } as const;

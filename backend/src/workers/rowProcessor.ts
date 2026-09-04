@@ -35,10 +35,9 @@ export interface ProcessedRow {
   errorMessage: string | null;
 }
 
-const DAILY_OT_THRESHOLD = 8;   // hours/day above which overtime applies
-// Note: weekly OT (>40h) is calculated at the aggregate/report level after all rows are processed,
-// not per-row, since weekly totals require grouping across multiple timesheet rows.
-const OT_MULTIPLIER = 1.5;
+import { PAYROLL_RULES } from '../config/payroll.constants.js';
+
+const { DAILY_OT_THRESHOLD, OT_MULTIPLIER } = PAYROLL_RULES;
 
 function parseTime(t: string): { h: number; m: number } | null {
   const parts = t.trim().match(/^(\d{1,2}):(\d{2})$/);

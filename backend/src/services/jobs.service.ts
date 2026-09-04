@@ -2,7 +2,6 @@ import { parse as parseCsv } from 'csv-parse';
 import Piscina from 'piscina';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
-import { Prisma } from '@prisma/client';
 import { logger } from '../config/logger.js';
 import type { RawRow, ProcessedRow } from '../workers/rowProcessor.js';
 import { generatePayrollReport } from './payroll.service.js';
@@ -15,10 +14,21 @@ const workerFile = isDev
   ? path.resolve(__dirname, '../workers/rowProcessor.ts')
   : path.resolve(__dirname, '../workers/rowProcessor.js');
 
+function getWorkerExecArgv(): string[] {
+  return process.execArgv.filter((arg) =>
+    arg.startsWith('--loader') ||
+    arg.startsWith('--import') ||
+    arg.startsWith('--require') ||
+    arg.startsWith('-r') ||
+    arg.includes('tsx') ||
+    arg.includes('ts-node')
+  );
+}
+
 const pool = new Piscina({
   filename: workerFile,
   maxThreads: 4,
-  execArgv: [...process.execArgv], // propagate --loader tsx / --import tsx to worker threads
+  execArgv: getWorkerExecArgv(),
   idleTimeout: 30_000,
 });
 
@@ -127,7 +137,34 @@ export async function processJob(jobId: string, organizationId: string): Promise
 
     // ── Pass raw rows through Piscina pool ──
     // We submit all rows to the pool; Piscina manages the queue internally.
-    const rawData: RawRow[] = JSON.parse((job as unknown as { rawData: string }).rawData ?? '[]');
+    let rawData: RawRow[] = [];
+    const rawDataField = (job as unknown as { rawData: unknown }).rawData;
+    if (rawDataField) {
+      if (typeof rawDataField === 'string') {
+        try { rawData = JSON.parse(rawDataField); } catch {}
+      } else if (Array.isArray(rawDataField)) {
+        rawData = rawDataField as RawRow[];
+      }
+    }
+
+    if (rawData.length === 0) {
+      // Fallback: reconstruct raw rows from existing TimesheetRows for legacy/reprocessed jobs
+      const existingRows = await prisma.timesheetRow.findMany({
+        where: { jobId },
+        orderBy: [{ date: 'asc' }, { clockIn: 'asc' }],
+      });
+      if (existingRows.length > 0) {
+        rawData = existingRows.map((r) => ({
+          employee_id: r.employeeCode,
+          employee_name: r.employeeName,
+          department: r.department,
+          date: r.date.toISOString().slice(0, 10),
+          clock_in: r.clockIn,
+          clock_out: r.clockOut,
+          hourly_rate: String(r.hourlyRate),
+        }));
+      }
+    }
 
     if (rawData.length === 0) {
       throw Object.assign(new Error('No rows found in uploaded file'), { statusCode: 400 });
@@ -268,7 +305,6 @@ export async function processJob(jobId: string, organizationId: string): Promise
         invalidRows: invalidCount,
         duplicateRows: duplicateCount,
         completedAt: new Date(),
-        rawData: Prisma.JsonNull, // free space after processing
       },
     });
 

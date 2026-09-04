@@ -33,6 +33,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../config/logger.js';
 import { stringify as csvStringify } from 'csv-stringify/sync';
+import { PAYROLL_RULES } from '../config/payroll.constants.js';
 
 // ─── Shared types (re-exported for controllers) ───────────────────────────────
 
@@ -150,6 +151,7 @@ function populationStdDev(values: number[]): number {
 // ─── Weekly OT reconciliation ─────────────────────────────────────────────────
 
 interface RawTimesheetRow {
+  id?: string;
   date: Date;
   clockIn: string;
   hourlyRate: Prisma.Decimal;
@@ -165,6 +167,7 @@ interface RawTimesheetRow {
 }
 
 interface ReconciledRow {
+  id?: string;
   date: Date;
   clockIn: string;
   clockOut: string;
@@ -178,8 +181,7 @@ interface ReconciledRow {
   department: string;
 }
 
-const WEEKLY_REGULAR_CAP = 40;
-const OT_MULTIPLIER = 1.5;
+const { WEEKLY_REGULAR_CAP, OT_MULTIPLIER } = PAYROLL_RULES;
 
 /**
  * Apply weekly 40h regular cap on top of daily OT already computed by Phase 3.
@@ -233,6 +235,7 @@ function reconcileWeeklyOvertime(rows: RawTimesheetRow[]): ReconciledRow[] {
 
       const rowKey = `${row.employeeCode}||${row.date.toISOString()}||${row.clockIn}`;
       resultMap.set(rowKey, {
+        id: row.id,
         date: row.date,
         clockIn: row.clockIn,
         clockOut: row.clockOut,
@@ -261,6 +264,7 @@ export async function generatePayrollReport(jobId: string, organizationId: strin
   const rawRows = await prisma.timesheetRow.findMany({
     where: { jobId, validationStatus: 'valid' },
     select: {
+      id: true,
       date: true, clockIn: true, clockOut: true,
       hourlyRate: true, hoursWorked: true,
       regularHours: true, overtimeHours: true, grossPay: true,
@@ -277,6 +281,25 @@ export async function generatePayrollReport(jobId: string, organizationId: strin
 
   // Apply weekly OT reconciliation
   const reconciled = reconcileWeeklyOvertime(rawRows as RawTimesheetRow[]);
+
+  // ── Persist reconciled regularHours, overtimeHours, and grossPay back to TimesheetRow in database ──
+  const rowsToUpdate = reconciled.filter((r) => r.id);
+  const UPDATE_BATCH_SIZE = 250;
+  for (let i = 0; i < rowsToUpdate.length; i += UPDATE_BATCH_SIZE) {
+    const batch = rowsToUpdate.slice(i, i + UPDATE_BATCH_SIZE);
+    await prisma.$transaction(
+      batch.map((r) =>
+        prisma.timesheetRow.update({
+          where: { id: r.id },
+          data: {
+            regularHours: r.effectiveRegularHours,
+            overtimeHours: r.effectiveOvertimeHours,
+            grossPay: r.effectiveGrossPay,
+          },
+        }),
+      ),
+    );
+  }
 
   jobLog.info({ reconciledRows: reconciled.length }, 'PAYROLL_CALCULATION_COMPLETED');
 
@@ -458,6 +481,7 @@ export async function getPayrollRows(jobId: string): Promise<PayrollRow[]> {
   const rows = await prisma.timesheetRow.findMany({
     where: { jobId, validationStatus: 'valid' },
     select: {
+      id: true,
       employeeCode: true, employeeName: true, department: true,
       hourlyRate: true, hoursWorked: true,
       regularHours: true, overtimeHours: true, grossPay: true,
@@ -515,6 +539,7 @@ export async function getEmployeePayrollDetail(
       ],
     },
     select: {
+      id: true,
       date: true, clockIn: true, clockOut: true,
       hourlyRate: true, hoursWorked: true,
       regularHours: true, overtimeHours: true, grossPay: true,
@@ -565,6 +590,7 @@ export async function generateExportCsv(jobId: string): Promise<string> {
   const rows = await prisma.timesheetRow.findMany({
     where: { jobId },
     select: {
+      id: true,
       employeeCode: true, employeeName: true, department: true,
       date: true, clockIn: true, clockOut: true, hourlyRate: true,
       hoursWorked: true, regularHours: true, overtimeHours: true,
@@ -573,21 +599,43 @@ export async function generateExportCsv(jobId: string): Promise<string> {
     orderBy: [{ date: 'asc' }, { clockIn: 'asc' }],
   });
 
-  const records = rows.map((r) => ({
-    employee_id: r.employeeCode,
-    employee_name: r.employeeName,
-    department: r.department,
-    date: r.date.toISOString().slice(0, 10),
-    clock_in: r.clockIn,
-    clock_out: r.clockOut,
-    hourly_rate: Number(r.hourlyRate).toFixed(2),
-    hours_worked: r.hoursWorked ? Number(r.hoursWorked).toFixed(2) : '',
-    regular_hours: r.regularHours ? Number(r.regularHours).toFixed(2) : '',
-    overtime_hours: r.overtimeHours ? Number(r.overtimeHours).toFixed(2) : '',
-    gross_pay: r.grossPay ? Number(r.grossPay).toFixed(2) : '',
-    validation_status: r.validationStatus,
-    error_message: r.errorMessage ?? '',
-  }));
+  // Reconcile weekly overtime across all valid rows
+  const validRows = rows.filter((r) => r.validationStatus === 'valid');
+  const reconciled = reconcileWeeklyOvertime(validRows as RawTimesheetRow[]);
+  const reconciledMap = new Map<string, ReconciledRow>();
+  for (const r of reconciled) {
+    if (r.id) {
+      reconciledMap.set(r.id, r);
+    } else {
+      const key = `${r.employeeCode}||${r.date.toISOString()}||${r.clockIn}`;
+      reconciledMap.set(key, r);
+    }
+  }
+
+  const records = rows.map((r) => {
+    const key = `${r.employeeCode}||${r.date.toISOString()}||${r.clockIn}`;
+    const rec = r.id ? reconciledMap.get(r.id) : reconciledMap.get(key);
+
+    const regularHours = rec ? rec.effectiveRegularHours : (r.regularHours ? Number(r.regularHours) : null);
+    const overtimeHours = rec ? rec.effectiveOvertimeHours : (r.overtimeHours ? Number(r.overtimeHours) : null);
+    const grossPay = rec ? rec.effectiveGrossPay : (r.grossPay ? Number(r.grossPay) : null);
+
+    return {
+      employee_id: r.employeeCode,
+      employee_name: r.employeeName,
+      department: r.department,
+      date: r.date.toISOString().slice(0, 10),
+      clock_in: r.clockIn,
+      clock_out: r.clockOut,
+      hourly_rate: Number(r.hourlyRate).toFixed(2),
+      hours_worked: r.hoursWorked ? Number(r.hoursWorked).toFixed(2) : '',
+      regular_hours: regularHours !== null ? regularHours.toFixed(2) : '',
+      overtime_hours: overtimeHours !== null ? overtimeHours.toFixed(2) : '',
+      gross_pay: grossPay !== null ? grossPay.toFixed(2) : '',
+      validation_status: r.validationStatus,
+      error_message: r.errorMessage ?? '',
+    };
+  });
 
   const csv = csvStringify(records, { header: true });
   logger.info({ jobId, rowCount: records.length }, 'EXPORT_GENERATED');
