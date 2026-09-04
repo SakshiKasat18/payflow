@@ -47,6 +47,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── Admin/HR route: redirect to /dashboard if role is EMPLOYEE ──────────────
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <SessionLoader />;
+  if (!isAuthenticated) return <Navigate to={ROUTES.LOGIN} replace />;
+  if (user?.role?.toUpperCase() === 'EMPLOYEE') {
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
+  }
+  return (
+    <DashboardLayout>
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
+    </DashboardLayout>
+  );
+}
+
 // ─── Public-only route: redirect to /dashboard if already logged in ───────────
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -67,13 +82,15 @@ function AppRoutes() {
 
       {/* Protected dashboard routes */}
       <Route path={ROUTES.DASHBOARD}   element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-      <Route path={ROUTES.UPLOAD}      element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
-      <Route path={ROUTES.JOBS}        element={<ProtectedRoute><JobsPage /></ProtectedRoute>} />
       <Route path={ROUTES.PAYROLL}     element={<ProtectedRoute><PayrollPage /></ProtectedRoute>} />
-      <Route path={ROUTES.EMPLOYEES}   element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
-      <Route path={ROUTES.DEPARTMENTS} element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
-      <Route path={ROUTES.REPORTS}     element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
       <Route path={ROUTES.SETTINGS}    element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+
+      {/* Admin/HR-only routes */}
+      <Route path={ROUTES.UPLOAD}      element={<AdminRoute><UploadPage /></AdminRoute>} />
+      <Route path={ROUTES.JOBS}        element={<AdminRoute><JobsPage /></AdminRoute>} />
+      <Route path={ROUTES.EMPLOYEES}   element={<AdminRoute><EmployeesPage /></AdminRoute>} />
+      <Route path={ROUTES.DEPARTMENTS} element={<AdminRoute><DepartmentsPage /></AdminRoute>} />
+      <Route path={ROUTES.REPORTS}     element={<AdminRoute><ReportsPage /></AdminRoute>} />
 
       {/* 404 → dashboard (will redirect to login if not authed) */}
       <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

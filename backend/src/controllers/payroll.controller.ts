@@ -8,6 +8,7 @@ import {
   getEmployeePayrollDetail,
   generateExportCsv,
   getDashboardAnalytics,
+  getEmployeeSelfPayroll,
 } from '../services/payroll.service.js';
 
 interface AppError extends Error { statusCode?: number; }
@@ -30,6 +31,24 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
   const { organizationId } = (req as AuthenticatedRequest).user;
   try {
     const data = await getDashboardAnalytics(organizationId);
+    res.json({ success: true, data });
+  } catch (err) { handleError(err, res, next); }
+}
+
+// GET /api/payroll/me
+export async function getMyPayroll(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const { userId, organizationId } = (req as AuthenticatedRequest).user;
+  try {
+    const data = await getEmployeeSelfPayroll(userId, organizationId);
+    res.json({ success: true, data });
+  } catch (err) { handleError(err, res, next); }
+}
+
+// GET /api/payroll/me/dashboard
+export async function getMyDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const { userId, organizationId } = (req as AuthenticatedRequest).user;
+  try {
+    const data = await getEmployeeSelfPayroll(userId, organizationId);
     res.json({ success: true, data });
   } catch (err) { handleError(err, res, next); }
 }

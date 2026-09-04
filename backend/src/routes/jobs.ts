@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth.js';
+import { requireRole } from '../middleware/rbac.js';
 import * as jobsController from '../controllers/jobs.controller.js';
 import * as payrollController from '../controllers/payroll.controller.js';
 
 const router = Router();
 
-// All jobs routes are protected
+// All jobs routes are protected by authentication and Admin/HR role
 router.use(requireAuth);
+router.use(requireRole(['ADMIN', 'HR']));
 
 // Multer: memory storage, 50 MB limit, only csv/json accepted
 const upload = multer({

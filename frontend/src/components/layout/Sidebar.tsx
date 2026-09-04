@@ -20,7 +20,7 @@ interface NavItem {
   to: string;
 }
 
-const WORKSPACE_NAV: NavItem[] = [
+const ADMIN_WORKSPACE_NAV: NavItem[] = [
   { label: 'Dashboard',         icon: <LayoutDashboard className="w-4 h-4" />, to: ROUTES.DASHBOARD },
   { label: 'Upload Timesheets', icon: <Upload className="w-4 h-4" />,          to: ROUTES.UPLOAD },
   { label: 'Processing Jobs',   icon: <Cpu className="w-4 h-4" />,             to: ROUTES.JOBS },
@@ -28,6 +28,11 @@ const WORKSPACE_NAV: NavItem[] = [
   { label: 'Employees',         icon: <Users className="w-4 h-4" />,           to: ROUTES.EMPLOYEES },
   { label: 'Departments',       icon: <Building2 className="w-4 h-4" />,       to: ROUTES.DEPARTMENTS },
   { label: 'Reports',           icon: <BarChart3 className="w-4 h-4" />,       to: ROUTES.REPORTS },
+];
+
+const EMPLOYEE_WORKSPACE_NAV: NavItem[] = [
+  { label: 'Dashboard',             icon: <LayoutDashboard className="w-4 h-4" />, to: ROUTES.DASHBOARD },
+  { label: 'My Payroll & Payslips', icon: <DollarSign className="w-4 h-4" />,      to: ROUTES.PAYROLL },
 ];
 
 const SYSTEM_NAV: NavItem[] = [
@@ -75,6 +80,9 @@ export function Sidebar() {
   const initials = user ? getInitials(user.name) : '?';
   const displayName = user?.name ?? 'Loading…';
   const orgName = user?.organizationName ?? '';
+  const isEmployee = user?.role?.toUpperCase() === 'EMPLOYEE';
+  const workspaceNav = isEmployee ? EMPLOYEE_WORKSPACE_NAV : ADMIN_WORKSPACE_NAV;
+  const roleDisplay = user?.role?.toUpperCase() ?? 'EMPLOYEE';
 
   return (
     <aside className="w-56 flex-shrink-0 bg-white border-r border-surface-200 flex flex-col h-screen sticky top-0">
@@ -96,7 +104,7 @@ export function Sidebar() {
         <div>
           <p className="section-label">Workspace</p>
           <ul className="space-y-0.5">
-            {WORKSPACE_NAV.map((item) => (
+            {workspaceNav.map((item) => (
               <li key={item.to}><NavItemLink item={item} /></li>
             ))}
           </ul>
@@ -112,14 +120,19 @@ export function Sidebar() {
       </nav>
 
       {/* Authenticated user at bottom */}
-      <div className="px-2 py-4 border-t border-surface-200 space-y-0.5">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-md">
+      <div className="px-2 py-4 border-t border-surface-200 space-y-1">
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-md">
           <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
             <span className="text-xs font-semibold text-primary-700">{initials}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-navy-800 truncate">{displayName}</p>
-            <p className="text-2xs text-navy-500 truncate">{orgName}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-2xs px-1.5 py-0.5 font-semibold rounded bg-surface-100 text-navy-600">
+                {roleDisplay}
+              </span>
+              <span className="text-2xs text-navy-400 truncate">{orgName}</span>
+            </div>
           </div>
         </div>
         <button
@@ -134,3 +147,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

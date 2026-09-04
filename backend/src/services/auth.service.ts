@@ -48,17 +48,21 @@ export async function signup(dto: SignupDto): Promise<AuthResponseDto> {
         email: email.toLowerCase(),
         passwordHash,
         organizationId: organization.id,
+        role: 'ADMIN', // Org creator is default ADMIN
       },
     });
     return { user, organization };
   });
 
-  logger.info({ userId: user.id, orgId: organization.id }, 'New user signed up');
+  logger.info({ userId: user.id, orgId: organization.id, role: user.role }, 'New user signed up');
 
   const token = signToken({
     userId: user.id,
     organizationId: organization.id,
     email: user.email,
+    role: user.role,
+    employeeId: user.employeeId,
+    employeeCode: null,
   });
 
   return {
@@ -67,6 +71,9 @@ export async function signup(dto: SignupDto): Promise<AuthResponseDto> {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
+      employeeId: user.employeeId,
+      employeeCode: null,
       organizationId: organization.id,
       organizationName: organization.name,
     },
@@ -88,7 +95,7 @@ export async function login(dto: LoginDto): Promise<AuthResponseDto> {
 
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
-    include: { organization: true },
+    include: { organization: true, employee: true },
   });
 
   if (!user) throw INVALID_CREDENTIALS;
@@ -96,12 +103,15 @@ export async function login(dto: LoginDto): Promise<AuthResponseDto> {
   const passwordMatch = await bcrypt.compare(password, user.passwordHash);
   if (!passwordMatch) throw INVALID_CREDENTIALS;
 
-  logger.info({ userId: user.id, orgId: user.organizationId }, 'User logged in');
+  logger.info({ userId: user.id, orgId: user.organizationId, role: user.role }, 'User logged in');
 
   const token = signToken({
     userId: user.id,
     organizationId: user.organizationId,
     email: user.email,
+    role: user.role,
+    employeeId: user.employeeId,
+    employeeCode: user.employee?.employeeCode ?? null,
   });
 
   return {
@@ -110,6 +120,9 @@ export async function login(dto: LoginDto): Promise<AuthResponseDto> {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
+      employeeId: user.employeeId,
+      employeeCode: user.employee?.employeeCode ?? null,
       organizationId: user.organizationId,
       organizationName: user.organization.name,
     },
@@ -119,7 +132,7 @@ export async function login(dto: LoginDto): Promise<AuthResponseDto> {
 export async function getMe(userId: string): Promise<AuthResponseDto['user']> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { organization: true },
+    include: { organization: true, employee: true },
   });
 
   if (!user) {
@@ -130,6 +143,9 @@ export async function getMe(userId: string): Promise<AuthResponseDto['user']> {
     id: user.id,
     name: user.name,
     email: user.email,
+    role: user.role,
+    employeeId: user.employeeId,
+    employeeCode: user.employee?.employeeCode ?? null,
     organizationId: user.organizationId,
     organizationName: user.organization.name,
   };

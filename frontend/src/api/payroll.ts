@@ -106,10 +106,68 @@ export interface DashboardAnalytics {
   recentJobs: RecentJob[];
 }
 
+export interface EmployeePayslipShift {
+  id: string;
+  date: string;
+  clockIn: string;
+  clockOut: string;
+  hoursWorked: number;
+  regularHours: number;
+  overtimeHours: number;
+  grossPay: number;
+}
+
+export interface EmployeePayslipSummary {
+  jobId: string;
+  filename: string;
+  date: string;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  grossPay: number;
+  hourlyRate: number;
+  shifts: EmployeePayslipShift[];
+}
+
+export interface EmployeeSelfPayroll {
+  employeeCode: string | null;
+  employeeName: string;
+  department: string | null;
+  hourlyRate: number;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  grossPay: number;
+  payslips: EmployeePayslipSummary[];
+  recentShifts: {
+    id: string;
+    jobId: string;
+    jobFilename: string;
+    date: string;
+    clockIn: string;
+    clockOut: string;
+    hoursWorked: number;
+    regularHours: number;
+    overtimeHours: number;
+    grossPay: number;
+    hourlyRate: number;
+  }[];
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export async function fetchDashboardAnalytics(): Promise<DashboardAnalytics> {
   const { data } = await apiClient.get<{ success: true; data: DashboardAnalytics }>('/payroll/dashboard');
+  return data.data;
+}
+
+export async function fetchMyPayroll(): Promise<EmployeeSelfPayroll> {
+  const { data } = await apiClient.get<{ success: true; data: EmployeeSelfPayroll }>('/payroll/me');
+  return data.data;
+}
+
+export async function fetchMyDashboard(): Promise<EmployeeSelfPayroll> {
+  const { data } = await apiClient.get<{ success: true; data: EmployeeSelfPayroll }>('/payroll/me/dashboard');
   return data.data;
 }
 
@@ -138,3 +196,4 @@ export async function regenerateAnalytics(jobId: string): Promise<Analytics> {
 export function getExportUrl(jobId: string): string {
   return `${apiClient.defaults.baseURL}/jobs/${jobId}/export`;
 }
+

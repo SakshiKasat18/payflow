@@ -1,11 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Filter, ArrowUpDown, ChevronDown, ChevronUp, X, DollarSign } from 'lucide-react';
+import {
+  Search,
+  Download,
+  Filter,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  X,
+  DollarSign,
+} from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { LoadingState, CardSkeleton } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fetchJobs } from '@/api/jobs';
-import { fetchJobPayroll, fetchJobAnalytics, fetchEmployeeDetail, type PayrollRow, type Analytics, type EmployeePayrollDetail } from '@/api/payroll';
+import {
+  fetchJobPayroll,
+  fetchJobAnalytics,
+  fetchEmployeeDetail,
+  fetchMyPayroll,
+  type PayrollRow,
+  type Analytics,
+  type EmployeePayrollDetail,
+  type EmployeeSelfPayroll,
+  type EmployeePayslipSummary,
+} from '@/api/payroll';
 import { apiClient } from '@/api/client';
+import { useAuth } from '@/context/AuthContext';
 import { formatCurrency, formatDate } from '@/constants';
 import { cn } from '@/lib/utils';
 import type { Job } from '@/api/jobs';
@@ -99,8 +119,183 @@ function EmployeeDetailModal({ jobId, employeeCode, onClose }: { jobId: string; 
   );
 }
 
-// ─── Main PayrollPage ─────────────────────────────────────────────────────────
-export default function PayrollPage() {
+// ─── Employee Self-Service Payroll View ───────────────────────────────────────
+function EmployeePayrollView() {
+  const [data, setData] = useState<EmployeeSelfPayroll | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedPayslip, setSelectedPayslip] = useState<EmployeePayslipSummary | null>(null);
+
+  useEffect(() => {
+    fetchMyPayroll()
+      .then((res) => {
+        setData(res);
+        if (res.payslips.length > 0) {
+          setSelectedPayslip(res.payslips[0]!);
+        }
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load payroll'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <PageHeader title="My Payroll & Payslips" subtitle="Personal payroll records and payslip breakdown." />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+        <CardSkeleton className="h-64" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <PageHeader title="My Payroll & Payslips" subtitle="Personal payroll records and payslip breakdown." />
+        <div className="bg-danger-50 border border-danger-100 rounded-lg p-4 text-sm text-danger-700">{error}</div>
+      </div>
+    );
+  }
+
+  const isEmpty = !data || (data.totalHours === 0 && data.payslips.length === 0);
+
+  return (
+    <div className="space-y-5 animate-fade-in">
+      <PageHeader
+        title="My Payroll & Payslips"
+        subtitle="Your verified hours, overtime earnings, and period-by-period payslips."
+      />
+
+      {isEmpty ? (
+        <div className="card">
+          <EmptyState
+            icon={<DollarSign className="w-6 h-6" />}
+            title="No payroll records found"
+            description="Your organization has not processed timesheets for your account yet. When processed, your earnings and shift logs will appear here."
+          />
+        </div>
+      ) : (
+        <>
+          {/* Summary KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Total Earnings', value: formatCurrency(data.grossPay), color: 'text-emerald-700' },
+              { label: 'Hourly Rate', value: data.hourlyRate > 0 ? `${formatCurrency(data.hourlyRate)}/hr` : '—', color: 'text-navy-800' },
+              { label: 'Regular Hours', value: `${data.regularHours.toFixed(1)}h`, color: 'text-navy-700' },
+              { label: 'Overtime Hours', value: `${data.overtimeHours.toFixed(1)}h`, color: 'text-amber-700' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="card p-4">
+                <p className="text-xs text-navy-500 font-medium">{label}</p>
+                <p className={cn('text-lg font-bold mt-0.5', color)}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Payslip Periods Selector & Detail */}
+          {data.payslips.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-navy-800">Processed Payslips</h2>
+                <span className="text-xs text-navy-500 font-medium">{data.payslips.length} pay periods</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {data.payslips.map((ps) => {
+                  const isSelected = selectedPayslip?.jobId === ps.jobId;
+                  return (
+                    <button
+                      key={ps.jobId}
+                      onClick={() => setSelectedPayslip(ps)}
+                      className={cn(
+                        'card p-4 text-left transition-all',
+                        isSelected
+                          ? 'border-primary-500 ring-2 ring-primary-100 bg-primary-50/20'
+                          : 'hover:border-surface-300',
+                      )}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-navy-800">{ps.filename}</p>
+                          <p className="text-2xs text-navy-500 mt-0.5">{formatDate(ps.date)}</p>
+                        </div>
+                        <span className="text-sm font-bold text-emerald-600">{formatCurrency(ps.grossPay)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-2xs text-navy-600 mt-3 pt-2 border-t border-surface-100">
+                        <span>{ps.totalHours.toFixed(1)}h total</span>
+                        <span className="text-amber-700 font-medium">{ps.overtimeHours.toFixed(1)}h OT</span>
+                        <span>{ps.shifts.length} shifts</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Payslip Shifts Breakdown */}
+              {selectedPayslip && (
+                <div className="card overflow-hidden">
+                  <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+                    <div>
+                      <h3 className="text-sm font-semibold text-navy-800">
+                        Shift Breakdown — {selectedPayslip.filename}
+                      </h3>
+                      <p className="text-2xs text-navy-500 mt-0.5">
+                        {formatDate(selectedPayslip.date)} · Gross Pay: {formatCurrency(selectedPayslip.grossPay)} ({selectedPayslip.totalHours.toFixed(1)} hours)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-surface-200 bg-surface-50">
+                          <th className="table-header px-4 py-3 text-left">Date</th>
+                          <th className="table-header px-4 py-3 text-right">Clock In</th>
+                          <th className="table-header px-4 py-3 text-right">Clock Out</th>
+                          <th className="table-header px-4 py-3 text-right">Hours Worked</th>
+                          <th className="table-header px-4 py-3 text-right">Regular Hrs</th>
+                          <th className="table-header px-4 py-3 text-right">Overtime Hrs</th>
+                          <th className="table-header px-4 py-3 text-right">Shift Pay</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-surface-100">
+                        {selectedPayslip.shifts.map((shift) => (
+                          <tr key={shift.id} className="hover:bg-surface-50 transition-colors">
+                            <td className="px-4 py-3 text-xs font-medium text-navy-700">{shift.date}</td>
+                            <td className="px-4 py-3 text-right text-xs text-navy-500">{shift.clockIn}</td>
+                            <td className="px-4 py-3 text-right text-xs text-navy-500">{shift.clockOut}</td>
+                            <td className="px-4 py-3 text-right text-xs text-navy-700 font-medium">{shift.hoursWorked.toFixed(1)}h</td>
+                            <td className="px-4 py-3 text-right text-xs text-navy-700">{shift.regularHours.toFixed(1)}h</td>
+                            <td className="px-4 py-3 text-right text-xs text-amber-700 font-medium">
+                              {shift.overtimeHours > 0 ? `${shift.overtimeHours.toFixed(1)}h` : '0.0h'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-xs font-semibold text-navy-800">{formatCurrency(shift.grossPay)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-surface-50 border-t border-surface-200">
+                          <td colSpan={3} className="px-4 py-3 text-xs font-semibold text-navy-700 text-left">Period Total</td>
+                          <td className="px-4 py-3 text-right text-xs font-bold text-navy-800">{selectedPayslip.totalHours.toFixed(1)}h</td>
+                          <td className="px-4 py-3 text-right text-xs font-medium text-navy-700">{selectedPayslip.regularHours.toFixed(1)}h</td>
+                          <td className="px-4 py-3 text-right text-xs font-medium text-amber-700">{selectedPayslip.overtimeHours.toFixed(1)}h</td>
+                          <td className="px-4 py-3 text-right text-xs font-bold text-navy-800">{formatCurrency(selectedPayslip.grossPay)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin / HR Org-Wide Payroll View ─────────────────────────────────────────
+function AdminPayrollView() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [rows, setRows] = useState<PayrollRow[]>([]);
@@ -349,4 +544,15 @@ export default function PayrollPage() {
       )}
     </div>
   );
+}
+
+export default function PayrollPage() {
+  const { user } = useAuth();
+  const isEmployee = user?.role?.toUpperCase() === 'EMPLOYEE';
+
+  if (isEmployee) {
+    return <EmployeePayrollView />;
+  }
+
+  return <AdminPayrollView />;
 }

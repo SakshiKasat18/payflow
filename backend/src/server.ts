@@ -45,24 +45,32 @@ app.use(errorHandler);
 
 // ─── Server Start ─────────────────────────────────────────────────────────────
 
-const server = app.listen(env.port, () => {
-  logger.info({
-    port: env.port,
-    environment: env.nodeEnv,
-    clientUrl: env.clientUrl,
-  }, `PayFlow API listening on port ${env.port}`);
-});
+const isTestEnv =
+  process.env['NODE_ENV'] === 'test' ||
+  process.argv.some((arg) => arg.includes('test') || arg.includes('__tests__'));
 
-// Graceful shutdown
-const shutdown = (signal: string): void => {
-  logger.info({ signal }, 'Shutdown signal received');
-  server.close(() => {
-    logger.info('HTTP server closed');
-    process.exit(0);
+if (!isTestEnv) {
+  const server = app.listen(env.port, () => {
+    logger.info({
+      port: env.port,
+      environment: env.nodeEnv,
+      clientUrl: env.clientUrl,
+    }, `PayFlow API listening on port ${env.port}`);
   });
-};
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+  // Graceful shutdown
+  const shutdown = (signal: string): void => {
+    logger.info({ signal }, 'Shutdown signal received');
+    server.close(() => {
+      logger.info('HTTP server closed');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
 
 export default app;
+
+

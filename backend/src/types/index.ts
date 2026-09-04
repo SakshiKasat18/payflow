@@ -1,10 +1,15 @@
 // ─── Shared backend TypeScript types ─────────────────────────────────────────
 
+export type UserRole = 'ADMIN' | 'HR' | 'EMPLOYEE';
+
 // JWT token payload — minimum identity, never include sensitive data
 export interface JwtPayload {
   userId: string;
   organizationId: string;
   email: string;
+  role: UserRole;
+  employeeId?: string | null;
+  employeeCode?: string | null;
 }
 
 // Authenticated request — extends Express Request
@@ -48,7 +53,11 @@ export interface AuthResponseDto {
     id: string;
     name: string;
     email: string;
+    role: UserRole;
+    employeeId?: string | null;
+    employeeCode?: string | null;
     organizationId: string;
     organizationName: string;
   };
 }
+

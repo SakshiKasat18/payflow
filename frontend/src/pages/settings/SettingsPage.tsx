@@ -117,10 +117,30 @@ export default function SettingsPage() {
                 className="input bg-surface-50 cursor-not-allowed text-navy-600"
               />
             </div>
+            <div>
+              <label htmlFor="profile-role" className="label">Assigned Role</label>
+              <input
+                id="profile-role"
+                type="text"
+                readOnly
+                value={user?.role?.toUpperCase() ?? 'EMPLOYEE'}
+                className="input bg-surface-50 cursor-not-allowed text-navy-600 font-semibold"
+              />
+            </div>
+            <div>
+              <label htmlFor="profile-employee-code" className="label">Employee ID</label>
+              <input
+                id="profile-employee-code"
+                type="text"
+                readOnly
+                value={user?.employeeCode ?? 'Linked via Organization'}
+                className="input bg-surface-50 cursor-not-allowed text-navy-600 font-mono"
+              />
+            </div>
           </div>
           <div className="pt-2 flex items-center justify-between text-xs text-navy-400">
-            <span>Profile details are managed via tenant authentication.</span>
-            <span className="text-2xs bg-surface-100 text-navy-500 px-2 py-1 rounded">Profile Editing: Roadmap</span>
+            <span>Profile and role permissions are enforced server-side.</span>
+            <span className="text-2xs bg-surface-100 text-navy-500 px-2 py-1 rounded">RBAC Protected</span>
           </div>
         </div>
       </div>

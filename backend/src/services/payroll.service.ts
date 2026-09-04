@@ -713,3 +713,213 @@ export async function getDashboardAnalytics(organizationId: string): Promise<Das
     recentJobs,
   };
 }
+
+// ─── Employee Self-Service (RBAC: Employee identity derived from server-side user) ───
+
+export interface EmployeePayslipSummary {
+  jobId: string;
+  filename: string;
+  date: Date;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  grossPay: number;
+  hourlyRate: number;
+  shifts: {
+    id: string;
+    date: string;
+    clockIn: string;
+    clockOut: string;
+    hoursWorked: number;
+    regularHours: number;
+    overtimeHours: number;
+    grossPay: number;
+  }[];
+}
+
+export interface EmployeeSelfPayroll {
+  employeeCode: string | null;
+  employeeName: string;
+  department: string | null;
+  hourlyRate: number;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  grossPay: number;
+  payslips: EmployeePayslipSummary[];
+  recentShifts: {
+    id: string;
+    jobId: string;
+    jobFilename: string;
+    date: string;
+    clockIn: string;
+    clockOut: string;
+    hoursWorked: number;
+    regularHours: number;
+    overtimeHours: number;
+    grossPay: number;
+    hourlyRate: number;
+  }[];
+}
+
+/**
+ * Derives and returns personal payroll data for the authenticated employee.
+ * Ensures strict tenant isolation and employee identity verification.
+ */
+export async function getEmployeeSelfPayroll(userId: string, organizationId: string): Promise<EmployeeSelfPayroll> {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, organizationId },
+    include: { employee: true },
+  });
+
+  if (!user) {
+    throw Object.assign(new Error('User not found in organization'), { statusCode: 404 });
+  }
+
+  // Identify linked employee or match by employeeCode / name in the organization
+  let employee = user.employee;
+  if (!employee && user.employeeId) {
+    employee = await prisma.employee.findFirst({
+      where: { id: user.employeeId, organizationId },
+    });
+  }
+
+  if (!employee) {
+    // Attempt fallback lookup by exact name in this organization
+    employee = await prisma.employee.findFirst({
+      where: {
+        organizationId,
+        name: { equals: user.name.trim(), mode: 'insensitive' },
+      },
+    });
+
+    // If found via fallback, link employeeId to user
+    if (employee) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { employeeId: employee.id },
+      });
+    }
+  }
+
+  if (!employee) {
+    // Clean empty state if employee has not been processed in any timesheets yet
+    return {
+      employeeCode: null,
+      employeeName: user.name,
+      department: null,
+      hourlyRate: 0,
+      totalHours: 0,
+      regularHours: 0,
+      overtimeHours: 0,
+      grossPay: 0,
+      payslips: [],
+      recentShifts: [],
+    };
+  }
+
+  // Fetch valid timesheet rows for this employee in completed jobs within this organization
+  const rows = await prisma.timesheetRow.findMany({
+    where: {
+      job: { organizationId, status: 'completed' },
+      validationStatus: 'valid',
+      OR: [
+        { employeeId: employee.id },
+        { employeeCode: employee.employeeCode },
+      ],
+    },
+    include: {
+      job: {
+        select: { id: true, filename: true, createdAt: true },
+      },
+    },
+    orderBy: [{ date: 'desc' }, { clockIn: 'desc' }],
+  });
+
+  if (rows.length === 0) {
+    return {
+      employeeCode: employee.employeeCode,
+      employeeName: employee.name,
+      department: employee.department,
+      hourlyRate: 0,
+      totalHours: 0,
+      regularHours: 0,
+      overtimeHours: 0,
+      grossPay: 0,
+      payslips: [],
+      recentShifts: [],
+    };
+  }
+
+  // Aggregate by job / payslip
+  const byJob = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const list = byJob.get(row.jobId) ?? [];
+    list.push(row);
+    byJob.set(row.jobId, list);
+  }
+
+  const payslips: EmployeePayslipSummary[] = Array.from(byJob.entries()).map(([jobId, jobRows]) => {
+    const first = jobRows[0]!;
+    const jobTotalHours = jobRows.reduce((s, r) => s + Number(r.hoursWorked ?? 0), 0);
+    const jobRegHours = jobRows.reduce((s, r) => s + Number(r.regularHours ?? 0), 0);
+    const jobOTHours = jobRows.reduce((s, r) => s + Number(r.overtimeHours ?? 0), 0);
+    const jobGross = jobRows.reduce((s, r) => s + Number(r.grossPay ?? 0), 0);
+    const jobHourlyRate = Number(first.hourlyRate);
+
+    return {
+      jobId,
+      filename: first.job.filename,
+      date: first.job.createdAt,
+      totalHours: parseFloat(jobTotalHours.toFixed(2)),
+      regularHours: parseFloat(jobRegHours.toFixed(2)),
+      overtimeHours: parseFloat(jobOTHours.toFixed(2)),
+      grossPay: parseFloat(jobGross.toFixed(2)),
+      hourlyRate: jobHourlyRate,
+      shifts: jobRows.map((r) => ({
+        id: r.id,
+        date: r.date.toISOString().slice(0, 10),
+        clockIn: r.clockIn,
+        clockOut: r.clockOut,
+        hoursWorked: Number(r.hoursWorked ?? 0),
+        regularHours: Number(r.regularHours ?? 0),
+        overtimeHours: Number(r.overtimeHours ?? 0),
+        grossPay: Number(r.grossPay ?? 0),
+      })),
+    };
+  });
+
+  const totalHours = rows.reduce((s, r) => s + Number(r.hoursWorked ?? 0), 0);
+  const regularHours = rows.reduce((s, r) => s + Number(r.regularHours ?? 0), 0);
+  const overtimeHours = rows.reduce((s, r) => s + Number(r.overtimeHours ?? 0), 0);
+  const grossPay = rows.reduce((s, r) => s + Number(r.grossPay ?? 0), 0);
+  const hourlyRate = Number(rows[0]?.hourlyRate ?? 0);
+
+  const recentShifts = rows.slice(0, 10).map((r) => ({
+    id: r.id,
+    jobId: r.jobId,
+    jobFilename: r.job.filename,
+    date: r.date.toISOString().slice(0, 10),
+    clockIn: r.clockIn,
+    clockOut: r.clockOut,
+    hoursWorked: Number(r.hoursWorked ?? 0),
+    regularHours: Number(r.regularHours ?? 0),
+    overtimeHours: Number(r.overtimeHours ?? 0),
+    grossPay: Number(r.grossPay ?? 0),
+    hourlyRate: Number(r.hourlyRate),
+  }));
+
+  return {
+    employeeCode: employee.employeeCode,
+    employeeName: employee.name,
+    department: employee.department,
+    hourlyRate,
+    totalHours: parseFloat(totalHours.toFixed(2)),
+    regularHours: parseFloat(regularHours.toFixed(2)),
+    overtimeHours: parseFloat(overtimeHours.toFixed(2)),
+    grossPay: parseFloat(grossPay.toFixed(2)),
+    payslips,
+    recentShifts,
+  };
+}
+

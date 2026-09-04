@@ -7,6 +7,7 @@ describe('PayFlow — Security & Authentication Tests', () => {
     userId: 'user-cmtm-12345',
     organizationId: 'org-cmtm-67890',
     email: 'admin.demo@payflow.local',
+    role: 'ADMIN' as const,
   };
 
   it('should sign and verify JWT correctly with valid claims', () => {
@@ -17,6 +18,7 @@ describe('PayFlow — Security & Authentication Tests', () => {
     assert.equal(decoded.userId, samplePayload.userId);
     assert.equal(decoded.organizationId, samplePayload.organizationId);
     assert.equal(decoded.email, samplePayload.email);
+    assert.equal(decoded.role, samplePayload.role);
   });
 
   it('should reject tampered JWT tokens', () => {

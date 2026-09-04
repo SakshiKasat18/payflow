@@ -36,16 +36,25 @@ model Organization {
 // Passwords are always stored as bcrypt hashes — never plaintext.
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum Role {
+  ADMIN
+  HR
+  EMPLOYEE
+}
+
 model User {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
-  email          String   @unique
+  email          String       @unique
   passwordHash   String
+  role           Role         @default(EMPLOYEE)
+  employeeId     String?
   organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([email])
@@ -68,6 +77,7 @@ model Employee {
 
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   timesheetRows  TimesheetRow[]
+  users          User[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId])

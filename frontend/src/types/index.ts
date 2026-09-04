@@ -19,16 +19,20 @@ export interface PaginatedResponse<T> {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'hr' | 'employee';
+export type UserRole = 'ADMIN' | 'HR' | 'EMPLOYEE' | 'admin' | 'hr' | 'employee';
 
 export interface User {
   id: string;
   email: string;
   name: string;
+  role: UserRole;
+  employeeId?: string | null;
+  employeeCode?: string | null;
   organizationId: string;
   organizationName: string;
-  createdAt: string;
+  createdAt?: string;
 }
+
 
 export interface AuthState {
   user: User | null;
