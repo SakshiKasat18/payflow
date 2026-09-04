@@ -113,39 +113,46 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 text-center text-xs text-navy-500">
+          {/* Demo Accounts section — Evaluator shortcut */}
+          <div className="mt-4 pt-4 border-t border-surface-100">
+            <p className="text-2xs text-navy-400 text-center mb-2 uppercase tracking-wide font-medium">
+              Demo Accounts
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                id="demo-admin-btn"
+                onClick={() => {
+                  setEmail('admin.demo@payflow.local');
+                  setPassword('Demo@Payflow2026');
+                }}
+                className="text-xs text-navy-600 font-medium border border-surface-200 rounded-md py-1.5 px-2.5 bg-surface-50 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors text-center"
+              >
+                Use Admin Demo
+              </button>
+              <button
+                type="button"
+                id="demo-employee-btn"
+                onClick={() => {
+                  setEmail('emp.demo@payflow.local');
+                  setPassword('Demo@Payflow2026');
+                }}
+                className="text-xs text-navy-600 font-medium border border-surface-200 rounded-md py-1.5 px-2.5 bg-surface-50 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors text-center"
+              >
+                Use Employee Demo
+              </button>
+            </div>
+            <p className="text-2xs text-navy-400 text-center mt-2">
+              Click to fill credentials, then click Sign in
+            </p>
+          </div>
+
+          <div className="mt-4 text-center text-xs text-navy-500">
             Don't have an account?{' '}
             <Link to={ROUTES.SIGNUP} className="text-primary-600 hover:text-primary-700 font-medium">
               Create one
             </Link>
           </div>
-
-          {/* Demo shortcuts — development only */}
-          {import.meta.env.DEV && (
-            <div className="mt-5 pt-5 border-t border-surface-100">
-              <p className="text-2xs text-navy-400 text-center mb-2 uppercase tracking-wide font-medium">
-                Demo accounts (Development Only)
-              </p>
-              <div className="flex gap-2">
-                {[
-                  { label: 'Admin / HR', email: 'admin.demo@payflow.local', password: 'Demo@Payflow2026' },
-                  { label: 'Employee',   email: 'emp.demo@payflow.local',   password: 'Demo@Payflow2026' },
-                ].map((demo) => (
-                  <button
-                    key={demo.email}
-                    type="button"
-                    onClick={() => { setEmail(demo.email); setPassword(demo.password); }}
-                    className="flex-1 text-2xs text-navy-500 border border-surface-200 rounded-md py-1.5 px-2 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                  >
-                    {demo.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-2xs text-surface-300 text-center mt-2">
-                Click to pre-fill, then Sign in
-              </p>
-            </div>
-          )}
         </div>
 
         <p className="text-center text-2xs text-surface-300 mt-6">
