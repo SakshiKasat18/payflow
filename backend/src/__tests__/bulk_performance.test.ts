@@ -9,7 +9,14 @@ describe('PayFlow — 10,000+ Row Bulk Processing Benchmark', () => {
   const pool = new Piscina({
     filename: workerFile,
     maxThreads: 4,
-    execArgv: [...process.execArgv],
+    execArgv: process.execArgv.filter((arg) =>
+      arg.startsWith('--loader') ||
+      arg.startsWith('--import') ||
+      arg.startsWith('--require') ||
+      arg.startsWith('-r') ||
+      arg.includes('tsx') ||
+      arg.includes('ts-node')
+    ),
     idleTimeout: 30_000,
   });
 
