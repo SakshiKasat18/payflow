@@ -1,11 +1,26 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import * as jobsController from '../controllers/jobs.controller.js';
 import * as payrollController from '../controllers/payroll.controller.js';
 
 const router = Router();
+
+// Rate limiter for upload endpoint: 20 requests per 20 minutes per IP
+export const uploadLimiter = rateLimit({
+  windowMs: 20 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      message: 'Too many timesheet upload requests from this IP. Please try again after 20 minutes.',
+    },
+  },
+});
 
 // All jobs routes are protected by authentication and Admin/HR role
 router.use(requireAuth);
@@ -26,8 +41,8 @@ const upload = multer({
   },
 });
 
-// POST /api/jobs/upload
-router.post('/upload', upload.single('timesheet'), jobsController.upload);
+// POST /api/jobs/upload (rate-limited specifically to 20 requests / 20 mins)
+router.post('/upload', uploadLimiter, upload.single('timesheet'), jobsController.upload);
 
 // GET  /api/jobs
 router.get('/', jobsController.listJobs);

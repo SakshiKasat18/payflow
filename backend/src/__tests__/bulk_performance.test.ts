@@ -5,6 +5,8 @@ import path from 'path';
 import type { RawRow, ProcessedRow } from '../workers/rowProcessor.js';
 
 describe('PayFlow — 10,000+ Row Bulk Processing Benchmark', () => {
+  // Allow 0ms delay for benchmarking per assignment specification
+  process.env['ROW_PROCESSING_DELAY_MS'] = '0';
   const workerFile = path.resolve(process.cwd(), 'src/workers/rowProcessor.ts');
   const pool = new Piscina({
     filename: workerFile,

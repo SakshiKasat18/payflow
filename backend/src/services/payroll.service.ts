@@ -852,7 +852,8 @@ export async function getEmployeeSelfPayroll(userId: string, organizationId: str
   }
 
   // Aggregate by job / payslip
-  const byJob = new Map<string, typeof rows>();
+  type TimesheetRowWithJob = (typeof rows)[number];
+  const byJob = new Map<string, TimesheetRowWithJob[]>();
   for (const row of rows) {
     const list = byJob.get(row.jobId) ?? [];
     list.push(row);

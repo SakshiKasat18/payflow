@@ -16,6 +16,11 @@ if (isProd && (!jwtSecret || jwtSecret === 'dev-secret-change-in-production')) {
 }
 jwtSecret = jwtSecret ?? 'dev-secret-change-in-production';
 
+const isTest = process.env['NODE_ENV'] === 'test';
+const defaultDelay = isTest ? '0' : '5';
+const rawDelay = process.env['ROW_PROCESSING_DELAY_MS'] ?? defaultDelay;
+const parsedDelay = parseInt(rawDelay, 10);
+
 export const env = {
   port: parseInt(process.env['PORT'] ?? '3001', 10),
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
@@ -24,4 +29,5 @@ export const env = {
   clientUrl: requireEnv('CLIENT_URL', 'http://localhost:5173'),
   isDevelopment: (process.env['NODE_ENV'] ?? 'development') === 'development',
   isProduction: isProd,
+  rowProcessingDelayMs: isNaN(parsedDelay) ? 5 : parsedDelay,
 } as const;

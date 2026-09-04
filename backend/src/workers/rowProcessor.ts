@@ -56,7 +56,13 @@ function minutesToHours(m: number): number {
   return parseFloat((m / 60).toFixed(4));
 }
 
-export default function processRow(raw: RawRow): ProcessedRow {
+export default async function processRow(raw: RawRow): Promise<ProcessedRow> {
+  const envDelay = process.env['ROW_PROCESSING_DELAY_MS'];
+  const delayMs = envDelay !== undefined ? parseInt(envDelay, 10) : (process.env['NODE_ENV'] === 'test' ? 0 : 5);
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
   const errors: string[] = [];
 
   // ── Required field presence ──

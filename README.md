@@ -166,6 +166,8 @@ npm run dev          # Starts Vite dev server on http://localhost:5173
 | `CLIENT_URL` | Allowed CORS origin | `http://localhost:5173` |
 | `PORT` | API server port | `3001` |
 | `NODE_ENV` | Runtime environment | `development` or `production` |
+| `ROW_PROCESSING_DELAY_MS` | Artificial per-row worker processing delay (default `5`ms for demo/assignment compliance, `0`ms for benchmarking) | `5` |
+
 
 ---
 
@@ -229,7 +231,7 @@ All `/api/jobs/*`, `/api/payroll/*`, and `/api/analytics/*` routes require an `A
 
 | Method | Route | Description | Status Codes |
 |---|---|---|---|
-| `POST` | `/api/jobs/upload` | Upload CSV/JSON file (`multipart/form-data`, field: `timesheet`) | `201 Created`, `400 Bad Request` |
+| `POST` | `/api/jobs/upload` | Upload CSV/JSON file (`multipart/form-data`, field: `timesheet`). Rate-limited to 20 req/20 min per IP. | `201 Created`, `400 Bad Request`, `429 Too Many Requests` |
 | `GET` | `/api/jobs` | List all timesheet upload jobs for organization | `200 OK`, `401 Unauthorized` |
 | `GET` | `/api/jobs/:id` | Fetch job details, status counts, and error samples | `200 OK`, `404 Not Found` |
 | `POST` | `/api/jobs/:id/process` | Re-trigger processing for a pending/failed job | `200 OK`, `404`, `409 Conflict` |
