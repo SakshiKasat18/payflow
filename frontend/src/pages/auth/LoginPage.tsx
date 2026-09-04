@@ -121,29 +121,31 @@ export default function LoginPage() {
           </div>
 
           {/* Demo shortcuts — development only */}
-          <div className="mt-5 pt-5 border-t border-surface-100">
-            <p className="text-2xs text-navy-400 text-center mb-2 uppercase tracking-wide font-medium">
-              Demo accounts
-            </p>
-            <div className="flex gap-2">
-              {[
-                { label: 'Admin / HR', email: 'admin.demo@payflow.local', password: 'Demo@Payflow2026' },
-                { label: 'Employee',   email: 'emp.demo@payflow.local',   password: 'Demo@Payflow2026' },
-              ].map((demo) => (
-                <button
-                  key={demo.email}
-                  type="button"
-                  onClick={() => { setEmail(demo.email); setPassword(demo.password); }}
-                  className="flex-1 text-2xs text-navy-500 border border-surface-200 rounded-md py-1.5 px-2 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                >
-                  {demo.label}
-                </button>
-              ))}
+          {import.meta.env.DEV && (
+            <div className="mt-5 pt-5 border-t border-surface-100">
+              <p className="text-2xs text-navy-400 text-center mb-2 uppercase tracking-wide font-medium">
+                Demo accounts (Development Only)
+              </p>
+              <div className="flex gap-2">
+                {[
+                  { label: 'Admin / HR', email: 'admin.demo@payflow.local', password: 'Demo@Payflow2026' },
+                  { label: 'Employee',   email: 'emp.demo@payflow.local',   password: 'Demo@Payflow2026' },
+                ].map((demo) => (
+                  <button
+                    key={demo.email}
+                    type="button"
+                    onClick={() => { setEmail(demo.email); setPassword(demo.password); }}
+                    className="flex-1 text-2xs text-navy-500 border border-surface-200 rounded-md py-1.5 px-2 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                  >
+                    {demo.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-2xs text-surface-300 text-center mt-2">
+                Click to pre-fill, then Sign in
+              </p>
             </div>
-            <p className="text-2xs text-surface-300 text-center mt-2">
-              Click to pre-fill, then Sign in
-            </p>
-          </div>
+          )}
         </div>
 
         <p className="text-center text-2xs text-surface-300 mt-6">
