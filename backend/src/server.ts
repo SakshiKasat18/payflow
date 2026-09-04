@@ -13,6 +13,9 @@ import analyticsRouter from './routes/analytics.js';
 
 const app = express();
 
+// Trust reverse proxy (Render / Cloudflare / Envoy) for accurate client IP in rate limiting
+app.set('trust proxy', 1);
+
 // ─── Core Middleware ─────────────────────────────────────────────────────────
 
 app.use(cors({
@@ -34,10 +37,6 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/payroll', payrollRouter);
 app.use('/api/analytics', analyticsRouter);
 
-// Phase 5+:
-// app.use('/api/payroll', payrollRouter);
-// app.use('/api/reports', reportsRouter);
-
 // ─── Error Handling ──────────────────────────────────────────────────────────
 
 app.use(notFound);
@@ -50,12 +49,13 @@ const isTestEnv =
   process.argv.some((arg) => arg.includes('test') || arg.includes('__tests__'));
 
 if (!isTestEnv) {
-  const server = app.listen(env.port, () => {
+  const server = app.listen(env.port, '0.0.0.0', () => {
     logger.info({
       port: env.port,
+      host: '0.0.0.0',
       environment: env.nodeEnv,
       clientUrl: env.clientUrl,
-    }, `PayFlow API listening on port ${env.port}`);
+    }, `PayFlow API listening on 0.0.0.0:${env.port}`);
   });
 
   // Graceful shutdown
