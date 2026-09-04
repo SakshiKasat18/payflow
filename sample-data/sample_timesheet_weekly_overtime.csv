@@ -1,0 +1,17 @@
+employee_id,employee_name,department,date,clock_in,clock_out,hourly_rate
+EMP-201,Aarav Sharma,Engineering,2026-08-03,08:00,16:00,250.00
+EMP-201,Aarav Sharma,Engineering,2026-08-04,08:00,16:00,250.00
+EMP-201,Aarav Sharma,Engineering,2026-08-05,08:00,16:00,250.00
+EMP-201,Aarav Sharma,Engineering,2026-08-06,08:00,16:00,250.00
+EMP-201,Aarav Sharma,Engineering,2026-08-07,08:00,16:00,250.00
+EMP-201,Aarav Sharma,Engineering,2026-08-08,08:00,16:00,250.00
+EMP-202,Bhavna Patel,Sales,2026-08-03,08:00,18:00,300.00
+EMP-202,Bhavna Patel,Sales,2026-08-04,08:00,18:00,300.00
+EMP-202,Bhavna Patel,Sales,2026-08-05,08:00,18:00,300.00
+EMP-202,Bhavna Patel,Sales,2026-08-06,08:00,18:00,300.00
+EMP-202,Bhavna Patel,Sales,2026-08-07,08:00,18:00,300.00
+EMP-203,Chetan Kumar,Operations,2026-08-03,09:00,17:00,200.00
+EMP-203,Chetan Kumar,Operations,2026-08-04,09:00,17:00,200.00
+EMP-203,Chetan Kumar,Operations,2026-08-05,09:00,17:00,200.00
+EMP-203,Chetan Kumar,Operations,2026-08-06,09:00,17:00,200.00
+EMP-203,Chetan Kumar,Operations,2026-08-07,09:00,17:00,200.00
