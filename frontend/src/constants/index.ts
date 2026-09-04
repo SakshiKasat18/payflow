@@ -143,6 +143,14 @@ export const formatCurrency = (amount: number): string =>
 export const formatNumber = (n: number): string =>
   new Intl.NumberFormat('en-IN').format(n);
 
+export const formatHours = (hours: number): string => {
+  const formatted = new Intl.NumberFormat('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  }).format(hours);
+  return `${formatted}h`;
+};
+
 export const formatDate = (iso: string): string =>
   new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',

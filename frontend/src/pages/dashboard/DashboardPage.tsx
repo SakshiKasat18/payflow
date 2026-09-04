@@ -3,7 +3,7 @@ import { Users, DollarSign, Clock, Zap, ChevronRight, MoreHorizontal, RefreshCw 
 import { useAuth } from '@/context/AuthContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell,
   LineChart, Line,
 } from 'recharts';
 import { Link } from 'react-router-dom';
@@ -13,7 +13,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CardSkeleton } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fetchDashboardAnalytics, type DashboardAnalytics } from '@/api/payroll';
-import { formatCurrency, formatDate, ROUTES } from '@/constants';
+import { formatCurrency, formatHours, formatDate, ROUTES } from '@/constants';
 
 const CHART_BLUE  = '#2563eb';
 const CHART_BLUE_LIGHT = '#bfdbfe';
@@ -62,14 +62,14 @@ export default function DashboardPage() {
   const isEmpty = !loading && !error && data && data.totalPayroll === 0 && data.recentJobs.length === 0;
 
   const regularHours = data ? data.totalRegularHours : 0;
-  const totalHours = data ? data.totalHours : 0;
   const overtimeHours = data ? data.totalOvertimeHours : 0;
-  const overtimePct = totalHours > 0 ? Math.round((overtimeHours / totalHours) * 100) : 0;
-  const regularPct = 100 - overtimePct;
+  const totalHours = regularHours + overtimeHours;
+  const regularPct = totalHours > 0 ? Math.round((regularHours / totalHours) * 100) : 0;
+  const overtimePct = totalHours > 0 ? 100 - regularPct : 0;
 
   const pieData = [
-    { name: `Regular Hours\n${regularHours.toLocaleString()}h (${regularPct}%)`, value: regularHours },
-    { name: `Overtime Hours\n${overtimeHours.toLocaleString()}h (${overtimePct}%)`, value: overtimeHours },
+    { name: 'Regular Hours', value: regularHours },
+    { name: 'Overtime Hours', value: overtimeHours },
   ];
 
   // Map dept metrics to chart format expected by recharts
@@ -162,14 +162,14 @@ export default function DashboardPage() {
             />
             <KPICard
               title="Total Hours"
-              value={`${totalHours.toLocaleString()}h`}
+              value={formatHours(totalHours)}
               icon={<Clock className="w-5 h-5" />}
               iconBg="bg-violet-50" iconColor="text-violet-600"
               note={`Avg ${data.averageHoursPerEmployee.toFixed(1)}h / employee`}
             />
             <KPICard
               title="Overtime Hours"
-              value={`${overtimeHours.toFixed(1)}h`}
+              value={formatHours(overtimeHours)}
               note={`${overtimePct}% of total hours · ${data.overtimeCostPercentage.toFixed(1)}% of payroll cost`}
               icon={<Zap className="w-5 h-5" />}
               iconBg="bg-amber-50" iconColor="text-amber-600"
@@ -201,32 +201,45 @@ export default function DashboardPage() {
 
             {/* Donut Chart */}
             <ChartCard title="Regular vs. Overtime Hours" className="lg:col-span-1">
-              <div className="flex items-center justify-center">
-                <div className="relative">
-                  <ResponsiveContainer width={180} height={180}>
-                    <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" strokeWidth={0}>
+              <div className="flex flex-col items-center justify-center">
+                <div className="relative w-[180px] h-[170px] flex items-center justify-center">
+                  <ResponsiveContainer width={180} height={170}>
+                    <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={54}
+                        outerRadius={78}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
                         {pieData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Legend formatter={(value) => <span className="text-xs text-navy-600">{value.split('\n')[0]}</span>} iconSize={8} iconType="circle" />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <p className="text-lg font-bold text-navy-800">{totalHours.toLocaleString()}h</p>
-                    <p className="text-2xs text-navy-500">Total Hours</p>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <p className="text-base font-bold text-navy-800 tracking-tight leading-tight">{formatHours(totalHours)}</p>
+                    <p className="text-2xs text-navy-500 font-medium">Total Hours</p>
                   </div>
                 </div>
               </div>
-              <div className="mt-2 space-y-1">
+              <div className="mt-3 pt-3 border-t border-surface-100 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary-600" /><span className="text-navy-600">Regular Hours</span></div>
-                  <span className="font-medium text-navy-800">{regularHours.toLocaleString()}h ({regularPct}%)</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary-600 flex-shrink-0" />
+                    <span className="text-navy-600 font-medium">Regular Hours</span>
+                  </div>
+                  <span className="font-semibold text-navy-800">{formatHours(regularHours)} ({regularPct}%)</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500" /><span className="text-navy-600">Overtime Hours</span></div>
-                  <span className="font-medium text-navy-800">{overtimeHours.toFixed(1)}h ({overtimePct}%)</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0" />
+                    <span className="text-navy-600 font-medium">Overtime Hours</span>
+                  </div>
+                  <span className="font-semibold text-navy-800">{formatHours(overtimeHours)} ({overtimePct}%)</span>
                 </div>
               </div>
             </ChartCard>
