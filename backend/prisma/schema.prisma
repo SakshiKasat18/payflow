@@ -1,0 +1,186 @@
+// PayFlow — Prisma Schema
+// PostgreSQL via Neon (or any Postgres-compatible host)
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORGANIZATION
+// Root tenant. All data is scoped to an organization.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  payrollJobs  PayrollJob[]
+  employees    Employee[]
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER
+// Belongs to an organization. All API access is authenticated via JWT.
+// Passwords are always stored as bcrypt hashes — never plaintext.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYEE
+// Derived from uploaded timesheet data. Indexed for fast department/code lookup.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Employee {
+  id             String   @id @default(cuid())
+  organizationId String
+  employeeCode   String   // e.g. "EMP-101"
+  name           String
+  department     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  timesheetRows  TimesheetRow[]
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId])
+  @@index([department])
+  @@map("employees")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYROLL JOB
+// Represents a single uploaded timesheet file and its processing lifecycle.
+// Status transitions: pending → processing → completed | failed
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model PayrollJob {
+  id             String    @id @default(cuid())
+  organizationId String
+  filename       String
+  status         JobStatus @default(pending)
+  totalRows      Int       @default(0)
+  processedRows  Int       @default(0)
+  validRows      Int       @default(0)
+  invalidRows    Int       @default(0)
+  duplicateRows  Int       @default(0)
+  errorMessage   String?
+  rawData        Json?     // temporary: raw parsed rows stored for async processing
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  timesheetRows  TimesheetRow[]
+  payrollReport  PayrollReport?
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("payroll_jobs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIMESHEET ROW
+// One row from the uploaded CSV. Stores both raw input and computed payroll.
+// validationStatus: valid | invalid | duplicate
+// Indexed on date and department for efficient payroll period queries.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ValidationStatus {
+  valid
+  invalid
+  duplicate
+}
+
+model TimesheetRow {
+  id               String           @id @default(cuid())
+  jobId            String
+  employeeId       String?          // populated after Employee upsert
+  employeeCode     String
+  employeeName     String
+  department       String
+  date             DateTime         @db.Date
+  clockIn          String           // stored as "HH:MM" string
+  clockOut         String           // stored as "HH:MM" string
+  hourlyRate       Decimal          @db.Decimal(10, 2)
+  hoursWorked      Decimal?         @db.Decimal(8, 2)
+  regularHours     Decimal?         @db.Decimal(8, 2)
+  overtimeHours    Decimal?         @db.Decimal(8, 2)
+  grossPay         Decimal?         @db.Decimal(12, 2)
+  validationStatus ValidationStatus @default(valid)
+  errorMessage     String?
+  createdAt        DateTime         @default(now())
+
+  job              PayrollJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employee         Employee?  @relation(fields: [employeeId], references: [id])
+
+  @@index([jobId])
+  @@index([jobId, validationStatus])
+  @@index([employeeCode, date])
+  @@index([department])
+  @@index([date])
+  @@map("timesheet_rows")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYROLL REPORT
+// One report per job. Stores aggregated metrics after processing completes.
+// departmentMetrics and weeklyTrend are stored as JSON for flexibility.
+// topOvertimeEmployees stores ordered list of top overtime contributors.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PayrollReport {
+  id                     String   @id @default(cuid())
+  jobId                  String   @unique
+  totalPayroll           Decimal  @db.Decimal(14, 2)
+  totalRegularHours      Decimal  @db.Decimal(10, 2)
+  totalOvertimeHours     Decimal  @db.Decimal(10, 2)
+  averageHoursPerEmployee Decimal @db.Decimal(8, 2)
+  overtimeCostPercentage Decimal  @db.Decimal(6, 2)
+  stdDeviationHours      Decimal  @db.Decimal(8, 2)
+  departmentMetrics      Json     // DepartmentMetric[]
+  weeklyTrend            Json     // WeeklyTrendPoint[]
+  topOvertimeEmployees   Json     // TopOvertimeEmployee[]
+  createdAt              DateTime @default(now())
+
+  job                    PayrollJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("payroll_reports")
+}
