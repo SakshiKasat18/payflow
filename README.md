@@ -4,6 +4,7 @@
 > A full-stack payroll calculation, timesheet validation, and workforce analytics platform capable of processing 10,000+ timesheet rows with weekly overtime reconciliation.
 >
 > **Live Demo:** [https://payflow-brown-chi.vercel.app/login](https://payflow-brown-chi.vercel.app/login)
+> **Note:** The live demo may take 50+ seconds to respond after periods of inactivity because the backend is hosted on Render’s free tier and spins down when idle.
 
 ---
 
